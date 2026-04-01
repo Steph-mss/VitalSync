@@ -9,7 +9,6 @@ on:
     branches: ["main"]
 
 jobs:
-
   # ════════════════════════════════════════════════════════════
   # ÉTAPE 1 – Lint & Tests
   # Bloque toute la suite si le lint ou les tests échouent
@@ -69,8 +68,8 @@ jobs:
           # Tag avec le SHA du commit : garantit la traçabilité et l'immuabilité de l'image.
           # "latest" seul est dangereux car il ne permet pas de rollback précis.
           tags: |
-            ghcr.io/${{ github.repository_owner }}/vitalsync-backend:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/vitalsync-backend:latest
+            ghcr.io/steph-mss/vitalsync-backend:${{ github.sha }}
+            ghcr.io/steph-mss/vitalsync-backend:latest
 
       - name: Build et Push image Frontend
         uses: docker/build-push-action@v4
@@ -78,8 +77,8 @@ jobs:
           context: ./frontend
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/vitalsync-frontend:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/vitalsync-frontend:latest
+            ghcr.io/steph-mss/vitalsync-frontend:${{ github.sha }}
+            ghcr.io/steph-mss/vitalsync-frontend:latest
 
   # ════════════════════════════════════════════════════════════
   # ÉTAPE 3 – Déploiement staging + Health check
@@ -119,7 +118,7 @@ jobs:
       - name: Afficher le statut du déploiement
         run: |
           echo "Staging deploye avec succes."
-          echo "Image backend : ghcr.io/${{ github.repository_owner }}/vitalsync-backend:${{ github.sha }}"
+          echo "Image backend : ghcr.io/steph-mss/vitalsync-backend:${{ github.sha }}"
           docker-compose ps
 
       - name: Arrêter la stack staging
