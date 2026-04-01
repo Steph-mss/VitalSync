@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  labels:
+    app: backend
+spec:
+  # 2 réplicas : tolère la panne d'un pod sans interruption de service.
+  # 1 serait un SPOF. 3 serait justifié uniquement si la charge le nécessite.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/TON_USERNAME/vitalsync-backend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DB_HOST
+              value: "postgres-service"
+            # Les valeurs sensibles sont injectées depuis le Secret Kubernetes
+            # (jamais en clair dans le manifeste)
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_PASSWORD
+          # Liveness probe : Kubernetes redémarre le pod si /health ne répond plus.
+          # Sans cette probe, un pod planté mais "vivant" continuerait à recevoir du trafic.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+          # Readiness probe : le pod ne reçoit de trafic que s'il est prêt.
