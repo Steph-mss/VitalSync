@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/TON_USERNAME/vitalsync-frontend:latest
+          image: ghcr.io/Steph-mss/vitalsync-frontend:latest
           ports:
             - containerPort: 80
           livenessProbe:
