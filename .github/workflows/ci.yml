@@ -86,7 +86,7 @@ jobs:
 
   # ════════════════════════════════════════════════════════════
   # ÉTAPE 3 – Déploiement staging + Health check
-  # Simule le staging via docker-compose sur le runner CI.
+  # Simule le staging via docker compose sur le runner CI.
   # La pipeline ÉCHOUE si le health check ne répond pas 200.
   # ════════════════════════════════════════════════════════════
   deploy-staging:
@@ -98,14 +98,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Créer le fichier .env pour docker-compose
+      - name: Créer le fichier .env pour docker compose
         run: |
           echo "DB_USER=${{ secrets.DB_USER }}" >> .env
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
           echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
 
-      - name: Lancer la stack staging (docker-compose)
-        run: docker-compose up -d --build
+      - name: Lancer la stack staging (docker compose)
+        run: docker compose up -d --build
 
       - name: Attendre le démarrage des services (15s)
         run: sleep 15
@@ -117,14 +117,14 @@ jobs:
           curl --fail --retry 5 --retry-delay 3 \
             http://localhost:3000/health \
             | grep '"status":"ok"' \
-            || (echo "Health check FAILED" && docker-compose logs backend && exit 1)
+            || (echo "Health check FAILED" && docker compose logs backend && exit 1)
 
       - name: Afficher le statut du déploiement
         run: |
           echo "Staging deploye avec succes."
           echo "Image backend : ghcr.io/steph-mss/vitalsync-backend:${{ github.sha }}"
-          docker-compose ps
+          docker compose ps
 
       - name: Arrêter la stack staging
         if: always()
-        run: docker-compose down
+        run: docker compose down
