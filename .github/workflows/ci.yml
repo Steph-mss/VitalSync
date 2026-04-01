@@ -41,13 +41,17 @@ jobs:
 
   # ════════════════════════════════════════════════════════════
   # ÉTAPE 2 – Build Docker + Push GHCR
-  # Uniquement sur push vers main (après merge)
   # ════════════════════════════════════════════════════════════
   docker-build-push:
     name: "Étape 2 – Build Docker & Push GHCR"
     needs: lint-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # ---- AJOUTE CE BLOC ICI ----
+    permissions:
+      contents: read
+      packages: write
+    # ----------------------------
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
