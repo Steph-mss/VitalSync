@@ -1,0 +1,127 @@
+name: VitalSync CI/CD
+
+on:
+  # Tests déclenchés sur push vers develop et vers main
+  push:
+    branches: ["develop", "main"]
+  # Tests déclenchés sur chaque Pull Request vers main (avant fusion)
+  pull_request:
+    branches: ["main"]
+
+jobs:
+
+  # ════════════════════════════════════════════════════════════
+  # ÉTAPE 1 – Lint & Tests
+  # Bloque toute la suite si le lint ou les tests échouent
+  # ════════════════════════════════════════════════════════════
+  lint-and-test:
+    name: "Étape 1 – Lint & Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Installer les dépendances
+        working-directory: ./backend
+        run: npm install
+
+      - name: Lint ESLint
+        working-directory: ./backend
+        run: npm run lint
+
+      - name: Tests unitaires Jest
+        working-directory: ./backend
+        run: npm test
+
+  # ════════════════════════════════════════════════════════════
+  # ÉTAPE 2 – Build Docker + Push GHCR
+  # Uniquement sur push vers main (après merge)
+  # ════════════════════════════════════════════════════════════
+  docker-build-push:
+    name: "Étape 2 – Build Docker & Push GHCR"
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN est injecté automatiquement par GitHub — jamais en clair
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build et Push image Backend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          # Tag avec le SHA du commit : garantit la traçabilité et l'immuabilité de l'image.
+          # "latest" seul est dangereux car il ne permet pas de rollback précis.
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/vitalsync-backend:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/vitalsync-backend:latest
+
+      - name: Build et Push image Frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/vitalsync-frontend:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/vitalsync-frontend:latest
+
+  # ════════════════════════════════════════════════════════════
+  # ÉTAPE 3 – Déploiement staging + Health check
+  # Simule le staging via docker-compose sur le runner CI.
+  # La pipeline ÉCHOUE si le health check ne répond pas 200.
+  # ════════════════════════════════════════════════════════════
+  deploy-staging:
+    name: "Étape 3 – Déploiement Staging & Health Check"
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Créer le fichier .env pour docker-compose
+        run: |
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+
+      - name: Lancer la stack staging (docker-compose)
+        run: docker-compose up -d --build
+
+      - name: Attendre le démarrage des services (15s)
+        run: sleep 15
+
+      - name: Health check du backend
+        # curl -f retourne un code d'erreur non-zero si HTTP != 2xx/3xx
+        # Si le backend ne répond pas "ok", la pipeline échoue ici
+        run: |
+          curl --fail --retry 5 --retry-delay 3 \
+            http://localhost:3000/health \
+            | grep '"status":"ok"' \
+            || (echo "Health check FAILED" && docker-compose logs backend && exit 1)
+
+      - name: Afficher le statut du déploiement
+        run: |
+          echo "Staging deploye avec succes."
+          echo "Image backend : ghcr.io/${{ github.repository_owner }}/vitalsync-backend:${{ github.sha }}"
+          docker-compose ps
+
+      - name: Arrêter la stack staging
+        if: always()
+        run: docker-compose down

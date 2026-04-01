@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+
+  db:
+    image: postgres:15-alpine
+    container_name: vitalsync_db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - vitalsync_net
+
+  backend:
+    build: ./backend
+    container_name: vitalsync_backend
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: db
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    depends_on:
+      - db
+    networks:
+      - vitalsync_net
+
+  frontend:
+    build: ./frontend
+    container_name: vitalsync_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - vitalsync_net
+
+networks:
+  vitalsync_net:
+    driver: bridge
+
+volumes:
+  pgdata:

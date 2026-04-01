@@ -1,0 +1,45 @@
+---
+# Service Backend (ClusterIP : accessible uniquement dans le cluster)
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP
+
+---
+# Service Frontend (NodePort ou LoadBalancer selon l'environnement)
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  selector:
+    app: frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30080   # Accessible sur <IP-du-node>:30080
+  type: NodePort
+
+---
+# Service PostgreSQL (ClusterIP : BDD jamais exposée publiquement)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
